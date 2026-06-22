@@ -14,11 +14,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// --- CRITICAL FIX: Dedicated Axios Instance ---
-// MangaDex REQUIRES a User-Agent. Creating an instance ensures it is sent with every API call.
+// Dedicated Axios Instance for MangaDex API
 const mangadexApi = axios.create({
     baseURL: 'https://api.mangadex.org',
-    timeout: 15000, // 15 seconds timeout to prevent hanging
+    timeout: 15000,
     headers: {
         'User-Agent': 'MangaDexDownloader/1.0 (Node.js Application; +https://github.com/your-repo)'
     }
@@ -81,7 +80,6 @@ app.get('/api/download/:chapterId', async (req, res) => {
     };
 
     try {
-        // Use the dedicated mangadexApi instance
         const atHomeRes = await mangadexApi.get(`/at-home/server/${chapterId}`);
         const { baseUrl, chapter } = atHomeRes.data;
         const { hash, data } = chapter;
@@ -96,9 +94,9 @@ app.get('/api/download/:chapterId', async (req, res) => {
             const filePath = path.join(tempDir, filename);
             const writer = fs.createWriteStream(filePath);
             
-            // Pass User-Agent to image downloads as well to avoid Cloudflare blocks            const response = await axios({ 
-                url, 
-                method: 'GET', 
+            // FIX: Explicitly defined 'url: url' to prevent syntax errors
+            const response = await axios({ 
+                url: url,                 method: 'GET', 
                 responseType: 'stream',
                 headers: {
                     'User-Agent': 'MangaDexDownloader/1.0 (Node.js Application; +https://github.com/your-repo)'
@@ -142,12 +140,12 @@ app.get('/api/download/:chapterId', async (req, res) => {
     }
 });
 
-// --- UPDATED: Fetch Chapters Endpoint with Detailed Error Handling ---
+// Fetch Chapters Endpoint
 app.post('/api/fetch-chapters', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
-    const match = url.match(/title\/([a-f0-9-]+)/);
-    if (!match) return res.status(400).json({ error: 'Invalid MangaDex URL format. Please use a URL like https://mangadex.org/title/uuid/...' });
+
+    const match = url.match(/title\/([a-f0-9-]+)/);    if (!match) return res.status(400).json({ error: 'Invalid MangaDex URL format. Please use a URL like https://mangadex.org/title/uuid/...' });
     const uuid = match[1];
 
     try {
@@ -161,9 +159,11 @@ app.post('/api/fetch-chapters', async (req, res) => {
 
         while (true) {
             const feedRes = await mangadexApi.get(`/manga/${uuid}/feed`, {
+                // FIX: Explicitly defined 'limit: limit' and 'offset: offset'
                 params: {
                     'translatedLanguage[]': 'en',
-                    limit, offset,
+                    limit: limit, 
+                    offset: offset,
                     'order[chapter]': 'asc',
                     'order[volume]': 'asc'
                 }
@@ -176,14 +176,15 @@ app.post('/api/fetch-chapters', async (req, res) => {
         const chapters = allChapters
             .filter(ch => !ch.attributes.externalUrl && ch.attributes.pages > 0)
             .map(ch => ({
-                id: ch.id, chapter: ch.attributes.chapter,
-                title: ch.attributes.title, pages: ch.attributes.pages,
+                id: ch.id, 
+                chapter: ch.attributes.chapter,
+                title: ch.attributes.title, 
+                pages: ch.attributes.pages,
                 volume: ch.attributes.volume
             }));
 
-        res.json({ title, chapters });
+        res.json({ title: title, chapters: chapters });
     } catch (error) {
-        // --- NEW: Detailed Error Logging ---
         console.error('--- MangaDex API Error ---');
         if (error.response) {
             console.error('Status:', error.response.status);
@@ -193,7 +194,6 @@ app.post('/api/fetch-chapters', async (req, res) => {
         }
         console.error('--------------------------');
 
-        // Return the actual error to the frontend so you can see it in the UI
         let errorMsg = 'Failed to fetch data from MangaDex.';        if (error.response) {
             errorMsg = `MangaDex API Error (${error.response.status}): ${JSON.stringify(error.response.data)}`;
         } else if (error.code === 'ECONNABORTED') {
