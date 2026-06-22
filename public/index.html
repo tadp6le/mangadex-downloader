@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MangaDex Downloader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MangaDex Chapter Downloader</h1>
+            <p>Paste a MangaDex URL to fetch and download chapters as CBZ files.</p>
+        </header>
+        
+        <div class="search-section">
+            <input type="text" id="urlInput" placeholder="https://mangadex.org/title/uuid/..." />
+            <button id="fetchBtn">Fetch Chapters</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div id="mangaInfo" class="manga-info" style="display: none;">
+            <h2 id="mangaTitle"></h2>
+        </div>
+
+        <div id="chaptersList" class="chapters-list" style="display: none;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Chapter</th>
+                        <th>Title</th>
+                        <th>Pages</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="chaptersBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- NEW: Real-time Progress Modal -->
+    <div id="downloadModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Downloading Chapter</h3>
+            <div class="progress-info">
+                <p id="progressStatus">Status: Initializing...</p>
+                <p id="progressFile">Current file: -</p>
+            </div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+  </html>
