@@ -3,54 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Download MangaDex chapters as CBZ files">
     <title>MangaDex Downloader</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="theme-toggle">
+        <button id="themeBtn" class="theme-btn" aria-label="Toggle theme">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+        </button>
+    </div>
+
     <div class="container">
-        <header>
-            <h1>MangaDex Chapter Downloader</h1>
-            <p>Paste a MangaDex URL to fetch and download chapters as CBZ files.</p>
-        </header>
-        
-        <div class="search-section">
-            <input type="text" id="urlInput" placeholder="https://mangadex.org/title/uuid/..." />
-            <button id="fetchBtn">Fetch Chapters</button>
-        </div>
-
-        <div id="status" class="status"></div>
-
-        <div id="mangaInfo" class="manga-info" style="display: none;">
-            <h2 id="mangaTitle"></h2>
-        </div>
-
-        <div id="chaptersList" class="chapters-list" style="display: none;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Chapter</th>
-                        <th>Title</th>
-                        <th>Pages</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="chaptersBody"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- NEW: Real-time Progress Modal -->
-    <div id="downloadModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>Downloading Chapter</h3>
-            <div class="progress-info">
-                <p id="progressStatus">Status: Initializing...</p>
-                <p id="progressFile">Current file: -</p>
+        <!-- Hero Section -->
+        <header class="hero">
+            <div class="hero-content">
+                <div class="hero-icon">📚</div>
+                <h1>MangaDex Downloader</h1>
+                <p class="subtitle">Download your favorite manga chapters as CBZ files</p>
             </div>
-            <div class="spinner"></div>
+        </header>
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="urlInput" 
+                    class="url-input" 
+                    placeholder="Paste MangaDex URL (e.g., https://mangadex.org/title/...)"
+                    autocomplete="off"
+                />
+                <button id="fetchBtn" class="btn btn-primary">
+                    <span class="btn-icon">🔍</span>
+                    Fetch Chapters
+                </button>
+            </div>
+            <div id="status" class="status-message"></div>
+        </section>
+
+        <!-- Manga Info Card -->
+        <div id="mangaCard" class="manga-card" style="display: none;">
+            <div class="manga-header">
+                <h2 id="mangaTitle" class="manga-title"></h2>
+                <span id="chapterCount" class="chapter-count"></span>
+            </div>
+        </div>
+
+        <!-- Chapters Grid -->
+        <section id="chaptersSection" class="chapters-section" style="display: none;">
+            <div class="chapters-header">
+                <h3>Available Chapters</h3>
+                <div class="chapters-controls">
+                    <input 
+                        type="text" 
+                        id="chapterFilter" 
+                        class="filter-input" 
+                        placeholder="Filter chapters..."
+                    />
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div class="chapters-table-wrapper">
+                <table id="chaptersTable" class="chapters-table">
+                    <thead>
+                        <tr>
+                            <th>Chapter</th>
+                            <th>Title</th>
+                            <th>Pages</th>
+                            <th>Volume</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="chaptersBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <p>No chapters found matching your search</p>
+            </div>
+        </section>
+
+        <!-- Download Progress Modal -->
+        <div id="downloadModal" class="modal" style="display: none;">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+                <div class="progress-container">
+                    <div class="progress-header">
+                        <h3>Download Progress</h3>
+                        <button class="close-btn" id="closeModalBtn">×</button>
+                    </div>
+
+                    <div class="progress-body">
+                        <div class="progress-status">
+                            <div class="status-icon">
+                                <svg class="spinner-icon" viewBox="0 0 50 50">
+                                    <circle class="spinner-circle" cx="25" cy="25" r="20" fill="none" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="status-label">Status</p>
+                                <p id="progressStatus" class="status-text">Connecting...</p>
+                            </div>
+                        </div>
+
+                        <div class="progress-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Current File:</span>
+                                <span id="progressFile" class="detail-value">-</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-footer">
+                        <p class="progress-tip">Don't close this window during download</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Toast -->
+        <div id="errorToast" class="toast toast-error" style="display: none;">
+            <div class="toast-icon">⚠️</div>
+            <div class="toast-content">
+                <p class="toast-title">Error</p>
+                <p id="errorToastMessage" class="toast-message"></p>
+            </div>
+            <button class="toast-close">×</button>
+        </div>
+
+        <!-- Success Toast -->
+        <div id="successToast" class="toast toast-success" style="display: none;">
+            <div class="toast-icon">✅</div>
+            <div class="toast-content">
+                <p class="toast-title">Success</p>
+                <p id="successToastMessage" class="toast-message"></p>
+            </div>
+            <button class="toast-close">×</button>
         </div>
     </div>
+
+    <!-- Skeleton Loader Template -->
+    <template id="skeletonRow">
+        <tr class="skeleton-row">
+            <td><div class="skeleton skeleton-text"></div></td>
+            <td><div class="skeleton skeleton-text"></div></td>
+            <td><div class="skeleton skeleton-text"></div></td>
+            <td><div class="skeleton skeleton-text"></div></td>
+            <td><div class="skeleton skeleton-button"></div></td>
+        </tr>
+    </template>
 
     <script src="script.js"></script>
 </body>
-  </html>
+</html>
