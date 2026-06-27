@@ -68,7 +68,7 @@ app.get('/api/progress/:downloadId', (req, res) => {
                 setTimeout(() => res.end(), 500);
             }
         } else {
-            res.write(`data: ${JSON.stringify({ status: 'waiting', file: 'Waiting for download to start...' })}\n\n`);
+            res.write(`data: ${JSON.stringify({ status: 'waiting', file: 'Waiting for download to start...', totalSize: 0 })}\n\n`);
         }
     }, 300);
 
