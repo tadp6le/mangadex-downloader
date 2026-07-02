@@ -90,7 +90,8 @@ app.get('/api/download/:chapterId', async (req, res) => {
     try {
         const atHomeRes = await mangadexApi.get(`/at-home/server/${chapterId}`);
         const { baseUrl, chapter } = atHomeRes.data;
-        const { hash, data } = chapter;
+        const { hash, dataSaver } = chapter;
+        const data = dataSaver; // Keep the variable name 'data' so the rest of the code doesn't break
         const total = data.length;
 
         tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mangadex-'));
@@ -105,7 +106,7 @@ app.get('/api/download/:chapterId', async (req, res) => {
         });
 
         const tasks = data.map((filename) => async () => {
-            const url = `${baseUrl}/data/${hash}/${filename}`;
+            const url = `${baseUrl}/data-saver/${hash}/${filename}`;
             const filePath = path.join(tempDir, filename);
             const writer = fs.createWriteStream(filePath);
 
