@@ -1,0 +1,29 @@
+Writing
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MangaDex Downloader</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body><h2>MangaDex Downloader</h2><form id="searchForm">
+  <input id="urlInput" placeholder="Paste MangaDex URL" />
+  <button type="submit">Fetch</button>
+</form><!-- NEW: Custom name --><div style="margin:10px 0;">
+  <input id="customName" placeholder="Enter file name (e.g. girl)" />
+</div><!-- NEW: Cover --><div>
+  <img id="coverImage" style="width:200px; display:none; margin:10px 0;" />
+</div><div id="mangaInfo">
+  <h3 id="mangaTitle"></h3>
+</div><button id="downloadSelectedBtn">Download Selected (Merged)</button>
+
+<table>
+  <thead>
+    <tr>
+      <th><input type="checkbox" id="checkAll"></th>
+      <th>Chapter</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="chaptersBody"></tbody>
+</table><script src="script.js"></script></body>
+</html>
