@@ -41,12 +41,13 @@ const downloadWithConcurrency = async (tasks, limit) => {
 // SSE Endpoint for Real-Time Progress
 app.get('/api/progress/:downloadId', (req, res) => {
     const downloadId = req.params.downloadId;
-    
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); 
-    res.flushHeaders(); 
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
     const interval = setInterval(() => {
         const progress = activeDownloads.get(downloadId);
         if (progress) {
@@ -63,13 +64,20 @@ app.get('/api/progress/:downloadId', (req, res) => {
     req.on('close', () => clearInterval(interval));
 });
 
-// Download Endpoint
+// Download Endpoint — buffers the archive so we can send Content-Length
+// (lets the browser show exact file size in its Downloads panel with pause/cancel)
 app.get('/api/download/:chapterId', async (req, res) => {
     const chapterId = req.params.chapterId;
     const downloadId = req.query.downloadId || crypto.randomUUID();
     let tempDir = null;
 
-    activeDownloads.set(downloadId, { status: 'preparing', file: 'Fetching chapter info...' });
+    activeDownloads.set(downloadId, {
+        status: 'preparing',
+        file: 'Fetching chapter info...',
+        downloaded: 0,
+        total: 0,
+        sizeBytes: 0
+    });
 
     const cleanup = async () => {
         activeDownloads.delete(downloadId);
@@ -82,57 +90,107 @@ app.get('/api/download/:chapterId', async (req, res) => {
     try {
         const atHomeRes = await mangadexApi.get(`/at-home/server/${chapterId}`);
         const { baseUrl, chapter } = atHomeRes.data;
-        const { hash, data } = chapter;
+        const { hash, dataSaver } = chapter;
+        const data = dataSaver; // Keep the variable name 'data' so the rest of the code doesn't break
+        const total = data.length;
 
         tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mangadex-'));
-        activeDownloads.set(downloadId, { status: 'downloading', file: 'Starting image downloads...' });
+
+        let downloaded = 0;
+        activeDownloads.set(downloadId, {
+            status: 'downloading',
+            file: 'Starting image downloads...',
+            downloaded,
+            total,
+            sizeBytes: 0
+        });
 
         const tasks = data.map((filename) => async () => {
-            activeDownloads.set(downloadId, { status: 'downloading', file: filename });
-            
-            const url = `${baseUrl}/data/${hash}/${filename}`;
+            const url = `${baseUrl}/data-saver/${hash}/${filename}`;
             const filePath = path.join(tempDir, filename);
             const writer = fs.createWriteStream(filePath);
-            
-            // FIX: Explicitly defined 'url: url' to prevent syntax errors
-            const response = await axios({ 
-                url: url,                 method: 'GET', 
+
+            const response = await axios({
+                url: url,
+                method: 'GET',
                 responseType: 'stream',
                 headers: {
                     'User-Agent': 'MangaDexDownloader/1.0 (Node.js Application; +https://github.com/your-repo)'
                 }
             });
             response.data.pipe(writer);
-            
+
             return new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
+                writer.on('finish', () => {
+                    downloaded++;
+                    activeDownloads.set(downloadId, {
+                        status: 'downloading',
+                        file: filename,
+                        downloaded,
+                        total,
+                        sizeBytes: 0
+                    });
+                    resolve();
+                });
                 writer.on('error', reject);
             });
         });
 
         await downloadWithConcurrency(tasks, 5);
 
-        activeDownloads.set(downloadId, { status: 'archiving', file: 'Creating CBZ archive...' });
+        activeDownloads.set(downloadId, {
+            status: 'archiving',
+            file: 'Creating CBZ archive...',
+            downloaded: total,
+            total,
+            sizeBytes: 0
+        });
 
-        const archive = archiver('zip', { zlib: { level: 0 } });
+        // Buffer archive to memory so we can compute exact size and send Content-Length
+        const archiveBuffer = await new Promise((resolve, reject) => {
+            const chunks = [];
+            const archive = archiver('zip', { zlib: { level: 0 } });
+            archive.on('data', (chunk) => chunks.push(chunk));
+            archive.on('end', () => resolve(Buffer.concat(chunks)));
+            archive.on('error', reject);
+            for (const filename of data) {
+                archive.file(path.join(tempDir, filename), { name: filename });
+            }
+            archive.finalize();
+        });
+
+        const sizeBytes = archiveBuffer.length;
+        const filename = `chapter_${chapterId}.cbz`;
+
+        // Content-Length lets the browser show exact size + a real progress bar
+        // in its own Downloads panel (where user can pause/cancel).
         res.setHeader('Content-Type', 'application/vnd.comicbook+zip');
-        res.setHeader('Content-Disposition', `attachment; filename="chapter_${chapterId}.cbz"`);
-        archive.pipe(res);
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', sizeBytes);
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Length');
 
-        for (const filename of data) {
-            const filePath = path.join(tempDir, filename);
-            archive.file(filePath, { name: filename });
-        }
+        activeDownloads.set(downloadId, {
+            status: 'finished',
+            file: filename,
+            downloaded: total,
+            total,
+            sizeBytes
+        });
 
-        await archive.finalize();
-        activeDownloads.set(downloadId, { status: 'finished', file: 'Done!' });
+        res.end(archiveBuffer);
 
         res.on('finish', cleanup);
         res.on('close', cleanup);
 
     } catch (error) {
         console.error('Download error:', error.message);
-        activeDownloads.set(downloadId, { status: 'error', file: error.message });
+        activeDownloads.set(downloadId, {
+            status: 'error',
+            file: error.message,
+            downloaded: 0,
+            total: 0,
+            sizeBytes: 0
+        });
         await cleanup();
         if (!res.headersSent) {
             res.status(500).send('Error generating CBZ archive');
@@ -145,7 +203,8 @@ app.post('/api/fetch-chapters', async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
-    const match = url.match(/title\/([a-f0-9-]+)/);    if (!match) return res.status(400).json({ error: 'Invalid MangaDex URL format. Please use a URL like https://mangadex.org/title/uuid/...' });
+    const match = url.match(/title\/([a-f0-9-]+)/);
+    if (!match) return res.status(400).json({ error: 'Invalid MangaDex URL format. Please use a URL like https://mangadex.org/title/uuid/...' });
     const uuid = match[1];
 
     try {
@@ -159,10 +218,9 @@ app.post('/api/fetch-chapters', async (req, res) => {
 
         while (true) {
             const feedRes = await mangadexApi.get(`/manga/${uuid}/feed`, {
-                // FIX: Explicitly defined 'limit: limit' and 'offset: offset'
                 params: {
                     'translatedLanguage[]': 'en',
-                    limit: limit, 
+                    limit: limit,
                     offset: offset,
                     'order[chapter]': 'asc',
                     'order[volume]': 'asc'
@@ -176,9 +234,9 @@ app.post('/api/fetch-chapters', async (req, res) => {
         const chapters = allChapters
             .filter(ch => !ch.attributes.externalUrl && ch.attributes.pages > 0)
             .map(ch => ({
-                id: ch.id, 
+                id: ch.id,
                 chapter: ch.attributes.chapter,
-                title: ch.attributes.title, 
+                title: ch.attributes.title,
                 pages: ch.attributes.pages,
                 volume: ch.attributes.volume
             }));
@@ -194,7 +252,8 @@ app.post('/api/fetch-chapters', async (req, res) => {
         }
         console.error('--------------------------');
 
-        let errorMsg = 'Failed to fetch data from MangaDex.';        if (error.response) {
+        let errorMsg = 'Failed to fetch data from MangaDex.';
+        if (error.response) {
             errorMsg = `MangaDex API Error (${error.response.status}): ${JSON.stringify(error.response.data)}`;
         } else if (error.code === 'ECONNABORTED') {
             errorMsg = 'Request timed out. MangaDex might be slow or blocking the connection.';
@@ -203,7 +262,7 @@ app.post('/api/fetch-chapters', async (req, res) => {
         } else {
             errorMsg = error.message;
         }
-        
+
         res.status(500).json({ error: errorMsg });
     }
 });
