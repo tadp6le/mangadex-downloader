@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MangaDex Downloader</title>
+
+<style>
+body {
+  margin: 0;
+  background: #0b0f19;
+  color: white;
+  font-family: Arial;
+}
+
+.container {
+  padding: 15px;
+  max-width: 500px;
+  margin: auto;
+}
+
+/* INPUTS */
+input {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  margin-bottom: 10px;
+  background: #1a2233;
+  color: white;
+}
+
+/* BUTTONS */
+button {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  background: orange;
+  color: black;
+  margin-bottom: 10px;
+}
+
+/* CHAPTER LIST */
+.chapter {
+  background: #151c2e;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chapter-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chapter span {
+  font-size: 16px;
+}
+
+.download-btn {
+  background: orange;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+h2, h3 {
+  margin-top: 10px;
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+<h2>MangaDex Downloader</h2>
+
+<form id="searchForm">
+  <input id="urlInput" placeholder="Paste MangaDex URL" />
+</form>
+
+<input id="customName" placeholder="Enter file name (e.g. girl)" />
+
+<h3 id="mangaTitle"></h3>
+
+<button id="downloadSelectedBtn">Download Selected (Merged)</button>
+
+<div id="chaptersList"></div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+  </html>
