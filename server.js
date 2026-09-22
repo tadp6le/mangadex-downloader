@@ -24,6 +24,37 @@ const mangadexApi = axios.create({
 });
 
 const activeDownloads = new Map();
+// --- Filename helpers -------------------------------------------------------
+const sanitizeFilenamePart = (str, maxLen = 60) =>
+    String(str || '')
+        .replace(/[\u0000-\u001f\u007f]/g, '')   // control chars
+        .replace(/[\\/:*?"<>|]/g, '')            // characters Windows/macOS forbid
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/[.\s]+$/, '')                  // Windows hates trailing dots/spaces
+        .slice(0, maxLen)
+        .replace(/[.\s]+$/, '')
+        || 'Manga';
+
+const buildCbzFilename = (query, chapterId) => {
+    // First three words of the manga title
+    const words = String(query.title || '').trim().split(/\s+/).filter(Boolean);
+    const shortTitle = sanitizeFilenamePart(words.slice(0, 3).join(' '));
+
+    const chapterNum = query.chapter ? String(query.chapter).trim() : '';
+    if (chapterNum) return `${shortTitle} - Ch. ${chapterNum}.cbz`;
+
+    // Fallback for oneshots (no chapter number) or direct URL hits
+    return `${shortTitle} - ${chapterId.slice(0, 8)}.cbz`;
+};
+
+const setContentDisposition = (res, filename) => {
+    // ASCII fallback + RFC 5987 UTF-8 version, so titles with
+    // non-Latin characters (e.g. Japanese) still save correctly
+    const fallback = filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+    res.setHeader('Content-Disposition',
+        `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+};
 
 const downloadWithConcurrency = async (tasks, limit) => {
     let index = 0;
@@ -160,12 +191,10 @@ app.get('/api/download/:chapterId', async (req, res) => {
         });
 
         const sizeBytes = archiveBuffer.length;
-        const filename = `chapter_${chapterId}.cbz`;
+       const filename = buildCbzFilename(req.query, chapterId);
 
-        // Content-Length lets the browser show exact size + a real progress bar
-        // in its own Downloads panel (where user can pause/cancel).
-        res.setHeader('Content-Type', 'application/vnd.comicbook+zip');
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+res.setHeader('Content-Type', 'application/vnd.comicbook+zip');
+setContentDisposition(res, filename);
         res.setHeader('Content-Length', sizeBytes);
         res.setHeader('Access-Control-Expose-Headers', 'Content-Length');
 
